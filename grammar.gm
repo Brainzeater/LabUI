@@ -1,0 +1,30 @@
+/*
+    statements reference
+    var count;
+    var value;
+    count = 5;
+    value = 100 + count;
+    value = value - count * 2;
+*/
+
+/*
+    NON_TERMINALS
+*/
+
+lang : (expr SM)+
+expr: declare | assign
+declare : VAR_KW VAR
+assign : VAR ASSIGN_OP stmt
+stmt : stmt_unit (OP stmt_unit)*
+stmt_unit : DIGIT | VAR
+
+/*
+    TERMINALS
+*/
+
+SM : ';'
+VAR_KW : 'var'
+ASSIGN_OP : '='
+OP : '-' | '+' | '/' | '*'
+DIGIT : 0 | [1-9]{1}[0-9]+
+VAR : [a-zA-Z]+

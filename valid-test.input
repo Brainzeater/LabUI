@@ -1,0 +1,8 @@
+var count;
+var value;
+count = 57;
+value = ( count + 4 );
+value =  (  count  + (value -count  )/ 3)   * 2;
+value=102+value;
+var wow;
+wow = (10+10*(12-2 )  )  +(7+3)*10+(  (   (0)));
