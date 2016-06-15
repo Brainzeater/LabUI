@@ -1,0 +1,22 @@
+struct b {
+    x = 10;
+    y = 20;
+};
+struct a {
+    x = 3;
+    y = 40;
+};
+var a;
+var b;
+var x;
+var y;
+x = 2;
+a = 5;
+y = 1;
+b = 4;
+b.x = a.x*(b.y - (a.y-a))   *   x + b -y;
+a.x = 5 + b.x;
+while(x > 0){
+    b.y = b.y + 1;
+    x = x -1;
+}

@@ -1,3 +1,4 @@
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -26,7 +27,9 @@ public class UI {
         /* Считать файл без ошибок */
         fileHelper.testRead("valid-test.input");
         /* Провести тест */
-        process("valid-test.input");
+        process("struct-test.input");
+//        process("cycle-test.input");
+//        process("valid-test.input");
     }
 
     /* Процедура теста */
@@ -36,8 +39,11 @@ public class UI {
         /* Преобразовать входной поток символов в список токенов */
         lexer.processInput(fileName);
         List<Token> tokens = lexer.getTokens();
+
+        HashMap<String, Integer> myVarTable = new HashMap<String, Integer>();
+        HashMap<String, HashMap<String, Integer>> structTable = new HashMap<String, HashMap<String, Integer>>();
         /* Создать экземпляр парсера с имеющимся списком токенов */
-        Parser parser = new Parser(tokens);
+        Parser parser = new Parser(tokens, myVarTable, structTable);
         /* Провести разбор списка токенов и сформировать выходную
          * последовательность в постфиксной записи */
         parser.lang();
@@ -45,15 +51,11 @@ public class UI {
         List<Token> postfixToken = parser.getPostfixToken();
         /* Отобразить список постфиксных токенов */
         for (Token val : postfixToken) {
-            System.out.println(val.getValue());
+            System.out.print(val.getValue());
         }
-        /* Создать экземпляр процессора постфиксных токенов
-         * и передать ему имеющийся список */
-        PolizProcessor processor = new PolizProcessor(postfixToken);
-        /* Запустить процессор постфиксных токенов */
-        processor.go();
         /* Отобразить таблицу переменных */
-        processor.printTable();
+        System.out.println(myVarTable);
+        System.out.println(structTable);
     }
 }
 

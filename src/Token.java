@@ -2,6 +2,7 @@ public class Token {
     private String name;
     private String value;
     private int priority;
+    private String structName;
 
     public Token(String name, String value) {
         this.name = name;
@@ -30,6 +31,14 @@ public class Token {
 
     public void setPriority(int priority) {
         this.priority = priority;
+    }
+
+    public void setStructName(String structName) {
+        this.structName = structName;
+    }
+
+    public String getStructName() {
+        return structName;
     }
 
     @Override

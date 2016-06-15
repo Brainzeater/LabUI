@@ -26,6 +26,18 @@ public class Lexer {
     Pattern divOpPattern = Pattern.compile("^/$");                      //  деление
     Pattern bracketOpenOpPattern = Pattern.compile("^[(]$");            //  (
     Pattern bracketCloseOpPattern = Pattern.compile("^[)]$");           //  )
+    Pattern curlyBracketOpenPattern = Pattern.compile("[{]");           //  {
+    Pattern curlyBracketClosePattern = Pattern.compile("[}]");          //  }
+    Pattern logicEqualsPattern = Pattern.compile("^==$");               //  ==
+    Pattern logicMorePattern = Pattern.compile("^>$");                  //  >
+    Pattern logicLessPattern = Pattern.compile("^<$");                  //  <
+    Pattern logicNotEqualsPattern = Pattern.compile("^!=$");            //  !=
+    Pattern logicMoreOrEqualsPattern = Pattern.compile("^>=$");         //  >=
+    Pattern logicLessOrEqualsPattern = Pattern.compile("^<=$");         //  <=
+    Pattern whileKeywordPattern = Pattern.compile("^while$");           //  while
+    Pattern structKeywordPattern = Pattern.compile("^struct$");         //  struct
+    Pattern dotPatten = Pattern.compile("^[.]$");                       //  .
+
     Map<String, Pattern> keyWords = new HashMap<String, Pattern>();     //  хэшмэп для ключевых слов
     Map<String, Pattern> regularTerminals = new HashMap<String, Pattern>(); // хэшмэп для терминалов
 
@@ -35,6 +47,8 @@ public class Lexer {
     /* В конструкторе Лексера заполняются хэшмэпы для ключевых слов и терминалов */
     public Lexer() {
         keyWords.put("VAR_KW", varKeywordPattern);
+        keyWords.put("WHILE_KW", whileKeywordPattern);
+        keyWords.put("STRUCT_KW", structKeywordPattern);
         regularTerminals.put("ASSIGN_SUB", subOpPattern);
         regularTerminals.put("SM", semicolPattern);
         regularTerminals.put("ASSIGN_ADD", addOperationPattern);
@@ -46,6 +60,15 @@ public class Lexer {
         regularTerminals.put("ASSIGN_DIV", divOpPattern);
         regularTerminals.put("BRACKET_OPEN", bracketOpenOpPattern);
         regularTerminals.put("BRACKET_CLOSE", bracketCloseOpPattern);
+        regularTerminals.put("C_BRACKET_OPEN", curlyBracketOpenPattern);
+        regularTerminals.put("C_BRACKET_CLOSE", curlyBracketClosePattern);
+        regularTerminals.put("EQUALS", logicEqualsPattern);
+        regularTerminals.put("MORE", logicMorePattern);
+        regularTerminals.put("LESS", logicLessPattern);
+        regularTerminals.put("NOT_EQUALS", logicNotEqualsPattern);
+        regularTerminals.put("MORE_EQUALS", logicMoreOrEqualsPattern);
+        regularTerminals.put("LESS_EQUALS", logicLessOrEqualsPattern);
+        regularTerminals.put("DOT", dotPatten);
     }
 
     /* Метод для обработки входной последовательности символов

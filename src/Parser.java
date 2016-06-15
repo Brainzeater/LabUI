@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Stack;
 
@@ -7,16 +8,17 @@ import java.util.Stack;
  */
 public class Parser {
     /* Приоритеты операций */
-    private final int BRACKET_PR = 5;
-    private final int MULT_DIV_PR = 4;
-    private final int ADD_SUB_PR = 3;
-    private final int VAR_PR = 2;
+    private final int BRACKET_PR = 6;
+    private final int MULT_DIV_PR = 5;
+    private final int ADD_SUB_PR = 4;
+    private final int LOGIC_PR = 3;
     private final int ASSIGN_OP_PR = 1;
-    //private final int NO_PR = -1;
     /* Список инфиксных токенов (входная последовательность парсера) */
     private List<Token> tokens;
     /* Список постфиксных токенов (выходная последовательность парсера)*/
-    private List<Token> postfixTokenList;
+    private ArrayList<Token> postfixTokenList;
+    private HashMap<String, Integer> varTable;
+    private HashMap<String, HashMap<String, Integer>> structVarTable;
     private Token currentToken; //текущий токен
     /* Номер текущего токена. Инкрементируется при соответствии ожидаемого токена
      * в проверяемом выражении текущему и декрементируетсяв обратном случае
@@ -25,13 +27,18 @@ public class Parser {
     private int currentTokenNumber = 0;
     private int closeBracketCounter;    //счётчик скобок
     private Stack<Token> operators;     //стек с операторами
+    private PolizProcessor poliz;
 
     /* Инициализация списков инфиксиных и постфиксных токенов,
      а также стека операторов в конструкторе Парсера */
-    public Parser(List<Token> tokens) {
+    public Parser(List<Token> tokens, HashMap<String, Integer> vT,
+                  HashMap<String, HashMap<String, Integer>> structTable) {
         this.tokens = tokens;
+        this.varTable = vT;
+        this.structVarTable = structTable;
         postfixTokenList = new ArrayList<Token>();
         operators = new Stack<Token>();
+        poliz = new PolizProcessor(postfixTokenList, vT, structVarTable);
     }
 
     /* Обработка входной последовательности */
@@ -48,19 +55,30 @@ public class Parser {
         }
         /* Отобразить сообщение об успешном прочтении списка токенов */
         if (currentTokenNumber == tokens.size()) {
+            if (!postfixTokenList.isEmpty()) {
+                System.out.println(postfixTokenList);
+                setPoliz();
+                poliz.go();
+                postfixTokenList.clear();
+            }
             System.out.println("Success");
         }
     }
 
     /* Проверка корректности выражения */
-    private boolean expr() throws Exception {
+    public boolean expr() throws Exception {
         /* Проверка корректности выражения объявления переменной или
         * присваивания переменной значения */
-        if (declare() || assign()) {
+        if (declare() || assign() || whileOperation() || structDeclare()) {
+            if (!postfixTokenList.isEmpty()) {
+                setPoliz();
+                poliz.go();
+                postfixTokenList.clear();
+            }
             return true;
-            /* Иначе отобразить сообщение об ошибке */
+//             Иначе отобразить сообщение об ошибке
         } else {
-            throw new Exception("declare or assign expected, but "
+            throw new Exception("declare or assign or while expected, but "
                     + currentToken + "found. " + currentTokenNumber);
         }
     }
@@ -76,15 +94,10 @@ public class Parser {
         if (varKw()) {
             /* Добавить текущий токен в выходной список
              с соответствующим приоритетом  */
-            currentToken.setPriority(VAR_PR);
-            postfixTokenList.add(currentToken);
             if (ws()) {
                 if (!varName()) {
                     currentTokenNumber--;
                     return false;
-                } else {
-                    /* Добавить имя объявленной переменной в выходной список */
-                    postfixTokenList.add(currentToken);
                 }
             } else {
                 currentTokenNumber--;
@@ -98,8 +111,24 @@ public class Parser {
             currentTokenNumber--;
             return false;
         } else {
+            /* Если выражение объявления написано правильно, то
+             * добавить в таблицу переменных токен перед ; */
+            addNewToVarTable(tokens.get(currentTokenNumber - 2));
             return true;
         }
+    }
+
+    /* Объявление переменной */
+    private void addNewToVarTable(Token declaredToken) {
+        /* Добавить в таблицу переменных новую переменную
+         * с именем токена и нулевым значением */
+        varTable.put(declaredToken.getValue(), 0);
+    }
+
+    private void addNewToStructTable(String structName) {
+        /* Добавить в таблицу переменных новую переменную
+         * с именем токена и нулевым значением */
+        structVarTable.put(structName, new HashMap<String, Integer>());
     }
 
     /* Проверка корректности присваивания переменной значения */
@@ -109,9 +138,6 @@ public class Parser {
          * имя переменной, знак присваивания, выражение. Строка завершается
          * точкой с запятой. Выражение проверяется на корректность применения скобок. */
         if (varName()) {
-            /* Если токен является операндом, то добавить его в конец выходного списка */
-            //currentToken.setPriority(NO_PR);
-            /* Добавить имя переменной в список */
             postfixTokenList.add(currentToken);
             /* Пропустить пробел */
             ignoreWhitespace();
@@ -127,9 +153,30 @@ public class Parser {
                             + currentToken + "found. " + currentTokenNumber);
                 }
             } else {
-                currentTokenNumber--;
-                return false;
+                postfixTokenList.clear();
+                currentTokenNumber -= 2;
+                if (structStmtUnit()) {
+                    ignoreWhitespace();
+                    if (assignOp()) {
+                /* Если токен является оператором присваивания, то
+                 * добваить его в стек операторов с соответствующим приоритетом. */
+                        currentToken.setPriority(ASSIGN_OP_PR);
+                        operators.push(currentToken);
+                /* Пропустить пробел */
+                        ignoreWhitespace();
+                        if (!stmt()) {
+                            throw new Exception("stmt  expected, but "
+                                    + currentToken + "found. " + currentTokenNumber);
+                        }
+                    }
+                } else {
+                    return false;
+                }
             }
+
+        } else {
+            currentTokenNumber--;
+
         }
         if (closeBracketCounter == 0) {
             if (sm()) {
@@ -138,6 +185,8 @@ public class Parser {
                 while (!operators.empty()) {
                     postfixTokenList.add(operators.pop());
                 }
+
+
                 return true;
             } else {
                 currentTokenNumber--;
@@ -168,7 +217,6 @@ public class Parser {
         if (stmtUnit()) {
             /* Если токен является операндом, то добавить его в конец
              * выходной последовательности */
-            postfixTokenList.add(currentToken);
             /* Пропустить пробел */
             ignoreWhitespace();
             /* Очередная проверка скобок */
@@ -201,8 +249,6 @@ public class Parser {
                     if (!stmtUnit()) {
                         throw new Exception("stmt_unit  expected, but "
                                 + currentToken + "found. " + currentTokenNumber);
-                    } else {
-                        postfixTokenList.add(currentToken);
                     }
                 } else {
                     currentTokenNumber--;
@@ -221,8 +267,6 @@ public class Parser {
                         if (!stmtUnit()) {
                             throw new Exception("stmt_unit  expected, but "
                                     + currentToken + "found. " + currentTokenNumber);
-                        } else {
-                            postfixTokenList.add(currentToken);
                         }
                     } else {
                         currentTokenNumber--;
@@ -238,8 +282,6 @@ public class Parser {
                             if (!stmtUnit()) {
                                 throw new Exception("stmt_unit  expected, but "
                                         + currentToken + "found. " + currentTokenNumber);
-                            } else {
-                                postfixTokenList.add(currentToken);
                             }
                         } else {
                             currentTokenNumber--;
@@ -255,8 +297,6 @@ public class Parser {
                                 if (!stmtUnit()) {
                                     throw new Exception("stmt_unit  expected, but "
                                             + currentToken + "found. " + currentTokenNumber);
-                                } else {
-                                    postfixTokenList.add(currentToken);
                                 }
                             } else {
                                 /* В случае, если не было найдено ни одного
@@ -290,14 +330,312 @@ public class Parser {
         if (!digit()) {
             currentTokenNumber--;
             badTry = false;
-            if (varName() && !badTry) {
+            if (varName() && !tokens.get(currentTokenNumber).getName().equals("DOT") && !badTry) {
                 badTry = true;
+                postfixTokenList.add(tokens.get(currentTokenNumber - 1));
             } else {
                 currentTokenNumber--;
-                badTry = false;
+                if (structStmtUnit()) {
+                    badTry = true;
+                } else {
+                    currentTokenNumber--;
+                    badTry = false;
+                }
             }
+        } else {
+            postfixTokenList.add(tokens.get(currentTokenNumber - 1));
         }
         return badTry;
+    }
+
+    private boolean structStmtUnit() throws Exception {
+        if (varName()) {
+            String curStrName = tokens.get(currentTokenNumber - 1).getValue();
+            if (structVarTable.containsKey(curStrName)) {
+                if (dot()) {
+                    if (varName()) {
+                        String curName = tokens.get(currentTokenNumber - 1).getValue();
+                        if (structVarTable.get(curStrName).containsKey(curName)) {
+                            Token structToken = new Token("STRUCT_TOKEN", currentToken.getValue());
+                            structToken.setStructName(curStrName);
+                            postfixTokenList.add(structToken);
+                            return true;
+                        } else {
+                            currentTokenNumber--;
+                            return false;
+                        }
+                    } else {
+                        currentTokenNumber--;
+                        return false;
+                    }
+                } else {
+                    currentTokenNumber--;
+                    return false;
+                }
+            } else {
+                currentTokenNumber--;
+                return false;
+            }
+        } else {
+            currentTokenNumber--;
+            return false;
+        }
+    }
+
+    /* Проверка корректности вызова цикла */
+    private boolean whileOperation() throws Exception {
+        /* Сначала идёт ключевое слово while, затем скобки, содержащие выражение, после -
+         * фигурные скобки, содержащие выражения. */
+        if (whileKw()) {
+            ignoreWhitespace();
+            if (bracketOpen()) {
+                ignoreWhitespace();
+                if (condition()) {
+                    ignoreWhitespace();
+                    if (bracketClose()) {
+                        ignoreWhitespace();
+                        postfixTokenList.add(operators.pop());
+                        whileLoop currentWhile = new whileLoop(postfixTokenList);
+                        postfixTokenList.clear();
+                        poliz.setPostfixToken(currentWhile.getConditionTokens());
+                        if (poliz.conditionIsTrue()) {
+                            if (curlyBracketOpen()) {
+                                ignoreWhitespace();
+                                currentWhile.setMyStartingPoint(currentTokenNumber);
+                                while (poliz.conditionIsTrue()) {
+                                    while (!tokens.get(currentTokenNumber).getName().equals("C_BRACKET_CLOSE")) {
+                                        if (expr()) {
+                                            ignoreWhitespace();
+                                        }
+                                    }
+                                    if (tokens.get(currentTokenNumber).getName().equals("C_BRACKET_CLOSE")) {
+                                        currentTokenNumber = currentWhile.getMyStartingPoint();
+                                        poliz.setPostfixToken(currentWhile.getConditionTokens());
+                                        postfixTokenList.clear();
+                                    } else {
+                                        throw new Exception("while: missing right curly bracket");
+                                    }
+                                }
+                                int curlyBracketsCounter = 0;
+                                currentToken = tokens.get(currentTokenNumber);
+                                while (!currentToken.getName().equals("C_BRACKET_CLOSE") ||
+                                        curlyBracketsCounter != 0) {
+                                    if (currentToken.getName().equals("C_BRACKET_OPEN")) {
+                                        curlyBracketsCounter++;
+                                    }
+                                    if (currentToken.getName().equals("C_BRACKET_CLOSE")) {
+                                        curlyBracketsCounter--;
+                                    }
+                                    currentTokenNumber++;
+                                    currentToken = tokens.get(currentTokenNumber);
+                                }
+                                currentTokenNumber++;
+                                return true;
+                            } else {
+                                throw new Exception("while: missing left curly bracket");
+                            }
+                        } else {
+                            /* Пропуск while, условие которого не выполняется */
+                            int curlyBracketsCounter = 0;
+                            while (!currentToken.getName().equals("C_BRACKET_CLOSE") ||
+                                    curlyBracketsCounter != 0) {
+                                if (currentToken.getName().equals("C_BRACKET_OPEN")) {
+                                    curlyBracketsCounter++;
+                                }
+                                if (currentToken.getName().equals("C_BRACKET_CLOSE")) {
+                                    curlyBracketsCounter--;
+                                    currentTokenNumber--;
+                                }
+                                currentTokenNumber++;
+                                currentToken = tokens.get(currentTokenNumber);
+                            }
+                            currentTokenNumber++;
+                            return true;
+                        }
+                    } else {
+                        throw new Exception("while: missing right bracket");
+                    }
+                } else {
+                    throw new Exception("while: wrong condition");
+                }
+            } else {
+                throw new Exception("while: missing left bracket");
+            }
+        } else {
+            currentTokenNumber--;
+            return false;
+        }
+    }
+
+    private boolean condition() throws Exception {
+        boolean goToComparison = false;
+        ignoreWhitespace();
+        if (stmtUnit()) {
+            goToComparison = true;
+            ignoreWhitespace();
+        }
+        if (goToComparison) {
+            if (checkLogicSign()) {
+                ignoreWhitespace();
+                if (stmtUnit()) {
+                    return true;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    private boolean checkLogicSign() {
+        if (more()) {
+            currentToken.setPriority(LOGIC_PR);
+            checkPriority(LOGIC_PR);
+            operators.push(currentToken);
+            return true;
+        } else {
+            currentTokenNumber--;
+            if (less()) {
+                currentToken.setPriority(LOGIC_PR);
+                checkPriority(LOGIC_PR);
+                operators.push(currentToken);
+                return true;
+            } else {
+                currentTokenNumber--;
+                if (moreEquals()) {
+                    currentToken.setPriority(LOGIC_PR);
+                    checkPriority(LOGIC_PR);
+                    operators.push(currentToken);
+                    return true;
+                } else {
+                    currentTokenNumber--;
+                    if (lessEquals()) {
+                        currentToken.setPriority(LOGIC_PR);
+                        checkPriority(LOGIC_PR);
+                        operators.push(currentToken);
+                        return true;
+                    } else {
+                        currentTokenNumber--;
+                        if (equals()) {
+                            currentToken.setPriority(LOGIC_PR);
+                            checkPriority(LOGIC_PR);
+                            operators.push(currentToken);
+                            return true;
+                        } else {
+                            currentTokenNumber--;
+                            if (notEquals()) {
+                                currentToken.setPriority(LOGIC_PR);
+                                checkPriority(LOGIC_PR);
+                                operators.push(currentToken);
+                                return true;
+                            } else currentTokenNumber--;
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean structDeclare() throws Exception {
+        if (struct()) {
+            if (ws()) {
+                if (varName()) {
+                    String structName = currentToken.getValue();
+                    addNewToStructTable(structName);
+                    ignoreWhitespace();
+                    if (curlyBracketOpen()) {
+                        ignoreWhitespace();
+                        int currentName = currentTokenNumber;
+                        if (structAssign(structName)) {
+                            structVarTable.get(structName).put(tokens.get(currentName).getValue(), 0);
+                            setPoliz();
+                            poliz.go();
+                            ignoreWhitespace();
+                            currentName = currentTokenNumber;
+                            while (structAssign(structName)) {
+                                structVarTable.get(structName).put(tokens.get(currentName).getValue(), 0);
+                                ignoreWhitespace();
+                                currentName = currentTokenNumber;
+                                setPoliz();
+                                poliz.go();
+                                postfixTokenList.clear();
+                            }
+                            if (curlyBracketClose()) {
+                                if (sm()) {
+                                    return true;
+                                } else {
+                                    throw new Exception("struct: sm missing");
+                                }
+                            } else {
+                                throw new Exception("struct: left curly bracket missing");
+                            }
+                        } else {
+                            throw new Exception("struct: assign statement missing");
+                        }
+                    } else {
+                        throw new Exception("struct: right curly bracket missing");
+                    }
+                } else {
+                    throw new Exception("struct: name missing");
+                }
+            } else {
+                throw new Exception("struct: ws missing");
+            }
+        } else {
+            currentTokenNumber--;
+            return false;
+        }
+    }
+
+    private boolean structAssign(String structName) throws Exception {
+        if (varName()) {
+            Token structToken = new Token("STRUCT_TOKEN", currentToken.getValue());
+            structToken.setStructName(structName);
+            postfixTokenList.add(structToken);
+            ignoreWhitespace();
+            if (assignOp()) {
+                /* Если токен является оператором присваивания, то
+                 * добваить его в стек операторов с соответствующим приоритетом. */
+                currentToken.setPriority(ASSIGN_OP_PR);
+                operators.push(currentToken);
+                /* Пропустить пробел */
+                ignoreWhitespace();
+                if (!stmt()) {
+                    throw new Exception("stmt  expected, but "
+                            + currentToken + "found. " + currentTokenNumber);
+                }
+            } else {
+                currentTokenNumber--;
+                return false;
+            }
+
+        } else {
+            currentTokenNumber--;
+            return false;
+        }
+        if (closeBracketCounter == 0) {
+            if (sm()) {
+                /* Когда выражение обработано, добавить все оставшиеся
+                 операторы в выходную последовательность */
+                while (!operators.empty()) {
+                    postfixTokenList.add(operators.pop());
+                }
+
+
+                return true;
+            } else {
+                currentTokenNumber--;
+                return false;
+            }
+            /* В случае неверного количества скобок
+             отобразить сообщение об ошибке */
+        } else {
+            throw new Exception("illegal number of brackets");
+        }
     }
 
     /* Проверка бесконечного количества скобок.
@@ -337,7 +675,7 @@ public class Parser {
     private void checkPriority(int priority) {
         /* Повторять, до первой скобки, пока стек операторов не пуст и приоритет
          * предыдущего оператора больше или равен приоритету текущего */
-        while (operators.peek().getPriority() != BRACKET_PR && !operators.empty() &&
+        while (!operators.empty() && operators.peek().getPriority() != BRACKET_PR &&
                 (operators.peek().getPriority() >= priority)) {
             /* Если приоритет последнего оператора из стека больше или равен
              * приоритету текущего оператора, то извлечь его из стека и поместить
@@ -346,6 +684,12 @@ public class Parser {
                 postfixTokenList.add(operators.pop());
             }
         }
+    }
+
+    private void setPoliz() {
+        poliz.setPostfixToken(postfixTokenList);
+        poliz.setStructTable(structVarTable);
+        poliz.setVarTable(varTable);
     }
 
     /* Ниже приведены методы для проверки соответствия текущего
@@ -408,6 +752,61 @@ public class Parser {
     private boolean bracketClose() {
         match();
         return currentToken.getName().equals("BRACKET_CLOSE");
+    }
+
+    private boolean whileKw() {
+        match();
+        return currentToken.getName().equals("WHILE_KW");
+    }
+
+    private boolean curlyBracketOpen() {
+        match();
+        return currentToken.getName().equals("C_BRACKET_OPEN");
+    }
+
+    private boolean curlyBracketClose() {
+        match();
+        return currentToken.getName().equals("C_BRACKET_CLOSE");
+    }
+
+    private boolean equals() {
+        match();
+        return currentToken.getName().equals("EQUALS");
+    }
+
+    private boolean more() {
+        match();
+        return currentToken.getName().equals("MORE");
+    }
+
+    private boolean less() {
+        match();
+        return currentToken.getName().equals("LESS");
+    }
+
+    private boolean moreEquals() {
+        match();
+        return currentToken.getName().equals("MORE_EQUALS");
+    }
+
+    private boolean lessEquals() {
+        match();
+        return currentToken.getName().equals("LESS_EQUALS");
+    }
+
+    private boolean notEquals() {
+        match();
+        return currentToken.getName().equals("NOT_EQUALS");
+    }
+
+    private boolean struct() {
+        match();
+        return currentToken.getName().equals("STRUCT_KW");
+    }
+
+    private boolean dot() {
+        match();
+        return currentToken.getName().equals("DOT");
     }
 
     /* Пропустить пробел */

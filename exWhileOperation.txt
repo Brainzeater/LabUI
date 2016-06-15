@@ -1,0 +1,132 @@
+private boolean whileOperation() throws Exception {
+        /* Сначала идёт ключевое слово while, затем скобки, содержащие выражение, после -
+         * фигурные скобки, содержащие выражения. */
+        if (whileKw()) {
+            /*
+            if(!postfixTokenList.isEmpty()){
+                poliz.setPostfixToken(postfixTokenList);
+                poliz.go();
+                postfixTokenList.clear();
+            }
+            */
+            ignoreWhitespace();
+            if (bracketOpen()) {
+                ignoreWhitespace();
+                if (condition()) {
+                    ignoreWhitespace();
+                    if (bracketClose()) {
+                        ignoreWhitespace();
+                        postfixTokenList.add(operators.pop());
+                        whileLoop currentWhile = new whileLoop(postfixTokenList);
+                        for(int i = 3; i > 0; i--){
+                            postfixTokenList.remove(postfixTokenList.size()-1);
+                        }
+                        poliz.setPostfixToken(postfixTokenList);
+                        poliz.go();
+                        postfixTokenList.clear();
+/*
+                        poliz.setPostfixToken(postfixTokenList);
+                        if(poliz.conditionIsTrue()) {*/
+                            if (curlyBracketOpen()) {
+//                                postfixTokenList.add(currentToken);
+                                ignoreWhitespace();
+                                if(whileArrCounter!=0){
+                                    whileArrCounter++;
+                                }
+                                whileArr[whileArrCounter] = currentTokenNumber;
+                                while(!tokens.get(currentTokenNumber).getName().equals("C_BRACKET_CLOSE")){
+                                    if(expr()) {
+                                        ignoreWhitespace();
+                                    }
+                                }
+                                if(tokens.get(currentTokenNumber).getName().equals("C_BRACKET_CLOSE")){
+                                    currentWhile.setInstructionTokens(postfixTokenList);
+                                    /*whileLoop currentWhile = new whileLoop(postfixTokenList);
+                                    poliz.setPostfixToken(currentWhile.getConditionTokens());
+                                    while(poliz.conditionIsTrue()){
+                                        poliz.setPostfixToken(currentWhile.getInstructionTokens());
+                                        poliz.go();
+                                        poliz.setPostfixToken(currentWhile.getConditionTokens());
+                                    }
+                                    currentTokenNumber++;
+                                    postfixTokenList.clear();*/
+                                    /*while(poliz.conditionIsTrue()){
+                                        ArrayList<Token> instructions = new ArrayList<Token>();
+                                        for(int i = 3; i < postfixTokenList.size(); i++){
+                                            instructions.add(postfixTokenList.get(i));
+                                        }
+                                        int i = 3;
+                                        while(postfixTokenList.size() != 3){
+                                            postfixTokenList.remove(i);
+                                        }
+                                        currentTokenNumber = whileArr[whileArrCounter];
+                                        while(!tokens.get(currentTokenNumber).getName().equals("C_BRACKET_CLOSE")){
+                                            expr();
+                                            ignoreWhitespace();
+                                            poliz.setPostfixToken(instructions);
+                                            poliz.go();
+                                        }
+                                        currentTokenNumber = whileArr[whileArrCounter];
+                                        ignoreWhitespace();
+                                    }
+                                    currentTokenNumber++;
+
+*/
+                                    return true;
+                                }else{
+                                    throw new Exception("ololo");
+                                }
+                                /*if (expr()) {
+                                    ignoreWhitespace();
+                                    while (!curlyBracketClose()) {
+                                        currentTokenNumber--;
+                                        ignoreWhitespace();
+                                        expr();
+                                        ignoreWhitespace();
+                                    }
+                                    ignoreWhitespace();
+
+//                                currentTokenNumber--;
+//                                ignoreWhitespace();
+                                    if (curlyBracketClose()) {
+                                        postfixTokenList.add(currentToken);
+                                        return true;
+                                    } else {
+                                        throw new Exception("while: missing right curly bracket");
+                                    }
+                                } else {
+                                    throw new Exception("while: wrong body in while");
+                                }*/
+                            } else {
+                                throw new Exception("while: missing left curly bracket");
+                            }
+                        /*}else{
+                            *//* Пропуск while, условие которого не выполняется *//*
+                            int curlyBracketsCounter = 0;
+                            while(!currentToken.getName().equals("C_BRACKET_CLOSE")||
+                                    curlyBracketsCounter!=0){
+                                if(currentToken.getName().equals("C_BRACKET_OPEN")){
+                                    curlyBracketsCounter++;
+                                }
+                                if(currentToken.getName().equals("C_BRACKET_CLOSE")){
+                                    curlyBracketsCounter--;
+                                }
+                                currentTokenNumber++;
+                                currentToken = tokens.get(currentTokenNumber);
+                            }
+                            return true;
+                        }*/
+                    } else {
+                        throw new Exception("while: missing right bracket");
+                    }
+                } else {
+                    throw new Exception("while: wrong condition");
+                }
+            } else {
+                throw new Exception("while: missing left bracket");
+            }
+        } else {
+            currentTokenNumber--;
+            return false;
+        }
+    }

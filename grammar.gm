@@ -12,11 +12,16 @@
 */
 
 lang : (expr SM)+
-expr: declare | assign
-declare : VAR_KW VAR
+expr : declare | assign | while | structDeclare
+declare : VAR_KW VAR_NAME
 assign : VAR ASSIGN_OP stmt
-stmt : stmt_unit (OP stmt_unit)*
-stmt_unit : DIGIT | VAR
+while : WHILE_KW BRACKET_OPEN condition BRACKET_CLOSE C_BRACKET_OPEN cycleBody C_BRACKET_CLOSE
+stmt : stmt_unit (OP stmtUnit)*
+stmtUnit : DIGIT | VAR_NAME
+condition : (stmtUnit)
+ (MORE | LESS | MORE_EQUALS | LESS_EQUALS | EQUALS | NOT_EQUALS)
+cycleBody : (expr SM)+
+structDeclare : STRUCT_KW C_BRACKET_OPEN (assign)+ C_BRACKET_CLOSE
 
 /*
     TERMINALS
@@ -27,4 +32,16 @@ VAR_KW : 'var'
 ASSIGN_OP : '='
 OP : '-' | '+' | '/' | '*'
 DIGIT : 0 | [1-9]{1}[0-9]+
-VAR : [a-zA-Z]+
+VAR_NAME : [a-zA-Z]+
+WHILE_KW : 'while'
+BRACKET_OPEN : '('
+BRACKET_CLOSE : ')'
+C_BRACKET_OPEN : '{'
+C_BRACKET_CLOSE : '}'
+MORE : '>'
+LESS : '<'
+MORE_EQUALS : '>='
+LESS_EQUALS : '<='
+EQUALS : '=='
+NOT_EQUALS : '!='
+STRUCT_KW : struct
